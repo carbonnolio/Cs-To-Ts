@@ -11,11 +11,10 @@
   "scripts": {
     "test": "test",
     "start": "npm run build:live",
-    "build:live": "nodemon --exec ./node_modules/.bin/ts-node -- ./src/index.ts",
-    "bind-cleanup": "node ./dev-scripts/cleanup.js"
+    "build:live": "nodemon --exec ./node_modules/.bin/ts-node -- ./src/index.ts"
   },
   "author": "Grigory Novikov",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "chalk": "^2.3.1",
     "node": "^9.5.0",
