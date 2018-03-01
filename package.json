@@ -4,9 +4,9 @@
   "description": "Simple cs model converter.",
   "main": "lib/index",
   "types": "lib/index",
-  "repository" :
-  { "type" : "git"
-  , "url" : "https://github.com/carbonnolio/Cs-To-Ts.git"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carbonnolio/Cs-To-Ts.git"
   },
   "scripts": {
     "test": "test",
