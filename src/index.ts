@@ -1,6 +1,5 @@
 import * as yargs from 'yargs';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as mkdirp from 'mkdirp';
 import chalk from 'chalk';
 import FolderParser from './folderParser';
@@ -8,8 +7,8 @@ import FileParser from './fileParser';
 
 console.log(chalk.blue('Entering App...'));
 
-const workPath = 'C:/bb_repo/beacon_service/NPPortal.Api/src/NPPortal.Api/Models'; // Input dir
-const outputPath = 'C:/angular_stuff/interfaceTest'; // Output dir
+const workPath = ''; // Input dir
+const outputPath = ''; // Output dir
 
 const fParser = new FileParser('utf8');
 
