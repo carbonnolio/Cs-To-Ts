@@ -1,6 +1,8 @@
 import { promisify } from 'util';
 import * as fs from 'fs';
 
+import { FileData, CsProperty, CsModelData } from './interfaces';
+
 export default class FileParser {
 
     encoding: string;
@@ -26,11 +28,80 @@ export default class FileParser {
 
     csArrayTypes = ['List', 'Stack', 'Queue', 'IEnumerable', 'IList', 'ICollection'];
 
+    tsModels: any[] = [];
+
     readFileAsync = promisify(fs.readFile);
 
     constructor(encoding: string) {
         this.encoding = encoding;
     }
+
+    public dfsParse = (files: FileData[]) => {
+        //console.log(models);
+
+        const modelPromises = files.map(fileData => new Promise<(CsModelData | null)[]>((resolve, reject) => {
+            this.readFileAsync(fileData.filePath, this.encoding).then(content => {
+                if(content.indexOf('namespace') > -1) {
+                    const openNs = content.indexOf('{');
+                    const closeNs = content.lastIndexOf('}');
+    
+                    const classes = content.substring(openNs + 1, closeNs).trim().split('public class').filter(x => x.length > 0 ).map(x => x.trim());
+
+                    const csModels = classes.map(entity => {
+                        const openCl = entity.indexOf('{');
+                        const closeCl = entity.lastIndexOf('}');
+    
+                        if(openCl > -1 && closeCl > -1) {
+                            const entityName = entity.substring(0, openCl).trim();
+                            const entityContent = entity.substring(openCl + 1, closeCl).trim().split(/[\s]+/);
+
+                            return {
+                                modelName: entityName,
+                                modelContent: this.propArray(entityContent, [])
+                            };
+                        }
+
+                        return null;
+                    });
+
+                    resolve(csModels);
+                }
+            });
+        }));
+
+        Promise.all(modelPromises).then(models => {
+            const flatCsModels = models.reduce((prev, curr) => prev.concat(curr), []).filter(model => model !== null);
+
+            flatCsModels.forEach(model => console.log(model));
+        });
+    };
+
+    toTsModel = (csModel: CsModelData, filesData: FileData[]) => {
+        // const model = csModels.shift();
+
+        // if(model) {
+        //     const tsProps = model.content.map(csProp => {
+        //         const tsPropName = this.pascalToCamel(csProp.propName);
+        //         let tsPropType = this.mapPrimitiveType(csProp.propType);
+
+        //         let csFileData;
+
+        //         if(tsPropType === 'unresolved') {
+                    
+        //             csFileData = files.find(fileData => fileData.fileName === csProp.propType);
+        //         }
+
+        //         return {
+        //             imports: csFileData ? [csProp.propName] : [],
+        //             pType: csFileData ? csProp.propType : tsPropType,
+        //             propName: tsPropName,
+        //             isArray: csProp.isArray
+        //         };
+        //     });
+
+        //     console.log(tsProps);
+        // }
+    };
 
     public parseFile = (filePath = ''): Promise<any> => {
         return new Promise((resolve, reject) => {
@@ -66,7 +137,7 @@ export default class FileParser {
         });
     };
 
-    private propArray = (content: string[], arr: any[]): any[] => {
+    private propArray = (content: string[], arr: CsProperty[]): CsProperty[] => {
         const hasPublicProp = content.some(x => x === 'public');
     
         if(!hasPublicProp) return arr;
@@ -125,7 +196,7 @@ export default class FileParser {
         };
     }
     
-    private mapPrimitiveType = (csType: string): string => this.csCommonTypeMap[csType.toLowerCase()] || 'any';
+    private mapPrimitiveType = (csType: string): string => this.csCommonTypeMap[csType.toLowerCase()] || 'unresolved';
     
     private pascalToCamel = (str: string) => str ? str.replace(/^(?:[A-Z])+(?=[A-Z])|^[A-Z]/, x => x.toLowerCase()) : null;
     
@@ -133,7 +204,9 @@ export default class FileParser {
         const header = `export interface ${name} {\n`;
         const footer = '}';
     
-        const tsProps = csProps.reduce((prev, curr) => `${prev}\t${this.pascalToCamel(curr.propName)}: ${this.mapPrimitiveType(curr.propType)}${curr.isArray ? '[]' : ''};\n`, '');
+        const tsProps = csProps.reduce((prev, curr) => 
+            `${prev}\t${this.pascalToCamel(curr.propName)}: ${this.mapPrimitiveType(curr.propType)}${curr.isArray ? '[]' : ''};\n`, ''
+        );
     
         return `${header}${tsProps}${footer}`;
     };

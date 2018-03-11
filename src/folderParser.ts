@@ -1,6 +1,12 @@
 import { promisify } from 'util';
 import * as fs from 'fs';
 
+import { FileData } from './interfaces';
+
+// import es6PromiseLib = require('es6-promise');
+
+// const Promise = es6PromiseLib.Promise;
+
 export default class FolderParser {
 
     rootPath: string;
@@ -16,9 +22,9 @@ export default class FolderParser {
         this.expectedFileEnding = `.${this.extension}`;
     }
 
-    public parseFolder = (): Promise<any> => this.dirBfs([this.rootPath], []);
+    public parseFolder = (): Promise<FileData[]> => this.dirBfs([this.rootPath], []);
 
-    private dirBfs = (dirs: string[], files: any[]): Promise<any[]> => {
+    private dirBfs = (dirs: string[], files: FileData[]): Promise<FileData[]> => {
 
         if(dirs.length === 0) return new Promise((resolve, reject) => {
             resolve(files);
