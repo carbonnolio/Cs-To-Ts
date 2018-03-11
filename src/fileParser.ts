@@ -1,7 +1,7 @@
 import { promisify } from 'util';
 import * as fs from 'fs';
 
-import { FileData, CsProperty, CsModelData } from './interfaces';
+import { FileData, CsProperty, CsModelData, TsPropertyType, TsPropertyData, TsModelData } from './interfaces';
 
 export default class FileParser {
 
@@ -36,8 +36,7 @@ export default class FileParser {
         this.encoding = encoding;
     }
 
-    public dfsParse = (files: FileData[]) => {
-        //console.log(models);
+    public parse = (files: FileData[]): Promise<(TsModelData | null)[]> => {
 
         const modelPromises = files.map(fileData => new Promise<(CsModelData | null)[]>((resolve, reject) => {
             this.readFileAsync(fileData.filePath, this.encoding).then(content => {
@@ -69,72 +68,32 @@ export default class FileParser {
             });
         }));
 
-        Promise.all(modelPromises).then(models => {
-            const flatCsModels = models.reduce((prev, curr) => prev.concat(curr), []).filter(model => model !== null);
-
-            flatCsModels.forEach(model => console.log(model));
+        return new Promise<(TsModelData | null)[]>((resolve, reject) => {
+            Promise.all(modelPromises).then(models => {
+                const flatCsModels = models.reduce((prev, curr) => prev.concat(curr), []).filter(model => model !== null);
+    
+                const tsModels = flatCsModels.map(model => this.toTsModel(model, files));
+    
+                resolve(tsModels);
+            });
         });
     };
 
-    toTsModel = (csModel: CsModelData, filesData: FileData[]) => {
-        // const model = csModels.shift();
+    private toTsModel = (csModel: CsModelData | null, filesData: FileData[]) : TsModelData | null => {
+        if(csModel) {
+            const tsProps = csModel.modelContent.map(csProp => <TsPropertyData>{
+                typeDefinition: this.lookupTypeDefinition(csProp.propType, filesData),
+                propName: this.pascalToCamel(csProp.propName),
+                isArray: csProp.isArray
+            });
 
-        // if(model) {
-        //     const tsProps = model.content.map(csProp => {
-        //         const tsPropName = this.pascalToCamel(csProp.propName);
-        //         let tsPropType = this.mapPrimitiveType(csProp.propType);
+            return {
+                modelName: csModel.modelName,
+                properties: tsProps
+            };
+        }
 
-        //         let csFileData;
-
-        //         if(tsPropType === 'unresolved') {
-                    
-        //             csFileData = files.find(fileData => fileData.fileName === csProp.propType);
-        //         }
-
-        //         return {
-        //             imports: csFileData ? [csProp.propName] : [],
-        //             pType: csFileData ? csProp.propType : tsPropType,
-        //             propName: tsPropName,
-        //             isArray: csProp.isArray
-        //         };
-        //     });
-
-        //     console.log(tsProps);
-        // }
-    };
-
-    public parseFile = (filePath = ''): Promise<any> => {
-        return new Promise((resolve, reject) => {
-            this.readFileAsync(filePath, this.encoding).then(content => {
-
-                if(content.indexOf('namespace') > -1) {
-                    const openNs = content.indexOf('{');
-                    const closeNs = content.lastIndexOf('}');
-    
-                    const classes = content.substring(openNs + 1, closeNs).trim().split('public class').filter(x => x.length > 0 ).map(x => x.trim());
-    
-                    classes.forEach(entity => {
-                        const openCl = entity.indexOf('{');
-                        const closeCl = entity.lastIndexOf('}');
-    
-                        if(openCl > -1 && closeCl > -1) {
-                            const entityName = entity.substring(0, openCl).trim();
-                            const entityContent = entity.substring(openCl + 1, closeCl).trim().split(/[\s]+/);
-                            
-                            const tsPropArray = this.propArray(entityContent, []);
-                            
-                            const tsString = this.toTsString(entityName, tsPropArray);
-    
-                            return resolve({
-                                fileName: entityName,
-                                fileContent: tsString
-                            });
-                        }
-                    });
-                }
-            })
-            .catch(err => reject(err));
-        });
+        return null;
     };
 
     private propArray = (content: string[], arr: CsProperty[]): CsProperty[] => {
@@ -181,7 +140,7 @@ export default class FileParser {
     
         const isCollection = propString.match(/\<(?:<[^<>]+?>|[^<>\,])+?>/);
     
-        if(isCollection && isCollection.length > 0 && this.csArrayTypes.some(x => x === propData[0])) {
+        if(isCollection && isCollection.length > 0 && this.csArrayTypes.some(x => x === propString.substring(0, propString.indexOf('<')))) {
             return {
                 isArray: true,
                 arrType: isCollection[0].substring(1, isCollection[0].length - 1),
@@ -196,18 +155,20 @@ export default class FileParser {
         };
     }
     
-    private mapPrimitiveType = (csType: string): string => this.csCommonTypeMap[csType.toLowerCase()] || 'unresolved';
+    private mapPrimitiveType = (csType: string): string => this.csCommonTypeMap[csType.toLowerCase()] || 'any';
     
     private pascalToCamel = (str: string) => str ? str.replace(/^(?:[A-Z])+(?=[A-Z])|^[A-Z]/, x => x.toLowerCase()) : null;
-    
-    private toTsString = (name: string, csProps: any[]) => {
-        const header = `export interface ${name} {\n`;
-        const footer = '}';
-    
-        const tsProps = csProps.reduce((prev, curr) => 
-            `${prev}\t${this.pascalToCamel(curr.propName)}: ${this.mapPrimitiveType(curr.propType)}${curr.isArray ? '[]' : ''};\n`, ''
-        );
-    
-        return `${header}${tsProps}${footer}`;
+
+    private lookupTypeDefinition = (propType: string, filesData: FileData[]): TsPropertyType => {
+        
+        const propModelData = filesData.find(fileData => fileData.fileName === propType);
+
+        return propModelData ? {
+            propImportPath: propModelData.filePath,
+            propType: propType
+        } : {
+            propImportPath: null,
+            propType: this.mapPrimitiveType(propType)
+        };
     };
 }

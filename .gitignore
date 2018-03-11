@@ -60,3 +60,8 @@ typings/
 mock-data/
 !mock-data/.gitkeep
 
+# output tsc compiled files
+lib/
+
+#VS Code debug and setting files
+.vscode/
