@@ -17,7 +17,8 @@ export default class FileGenerator {
         this.mkdirpAsync(outputDir).then(() => {
             const fileGeneratorPromises = fileStrings.map(tsFileData => {
                 if(tsFileData) {
-                    this.writeFileAsync(`${outputDir}/${tsFileData.fileName}.ts`, tsFileData.fileContent, 'utf8');
+                    this.writeFileAsync(`${outputDir}/${tsFileData.fileName}.ts`, tsFileData.fileContent, 'utf8')
+                        .then(() => console.log(`File ${tsFileData.fileName}.ts created successfully.`));
                 }
             });
 

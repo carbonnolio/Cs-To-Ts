@@ -1,4 +1,5 @@
-import * as yargs from 'yargs';
+#!/usr/bin/env node
+
 import * as fs from 'fs';
 import { promisify } from 'util';
 import chalk from 'chalk';
@@ -6,22 +7,23 @@ import chalk from 'chalk';
 import FolderParser from './folderParser';
 import FileParser from './fileParser';
 import FileGenerator from './fileGenerator';
+import CommandHandler from './commandHandler';
 
 console.log(chalk.blue('Entering App...'));
 
-const workPath = 'D:/test/testapp/testapp/Models'; // Input dir
-const outputPath = 'D:/test'; // Output dir
-
 const statAsync = promisify(fs.stat);
 
-statAsync(workPath).then(stats => {
-    new FolderParser(workPath, 'cs').parseFolder().then(result => {
+new CommandHandler().handleCommands((input, output) => {
 
-        new FileParser('utf8').parse(result).then(tsProps => {
+    statAsync(input).then(stats => {
+        new FolderParser(input, 'cs').parseFolder().then(result => {
 
-            new FileGenerator().populateTsFiles(tsProps, 'D:/test/interfaces').then(res => console.log(res));
+            new FileParser('utf8').parse(result).then(tsProps => {
+                
+                new FileGenerator().populateTsFiles(tsProps, output);
+            });
         });
-    });
-}).catch(err => 
-    console.log(chalk.red(`${err}`))
-);
+    }).catch(err => 
+        console.log(chalk.red(`${err}`))
+    );
+});

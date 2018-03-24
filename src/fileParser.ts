@@ -1,7 +1,7 @@
 import { promisify } from 'util';
 import * as fs from 'fs';
 
-import { FileData, CsProperty, CsModelData, TsPropertyType, TsPropertyData, TsModelData } from './interfaces';
+import { FileData, CsProperty, CsModelData, TsPropertyType, TsPropertyData, TsModelData, Nesting } from './interfaces';
 
 export default class FileParser {
 
@@ -40,28 +40,17 @@ export default class FileParser {
 
         const modelPromises = files.map(fileData => new Promise<(CsModelData | null)[]>((resolve, reject) => {
             this.readFileAsync(fileData.filePath, this.encoding).then(content => {
+
                 if(content.indexOf('namespace') > -1) {
                     const openNs = content.indexOf('{');
                     const closeNs = content.lastIndexOf('}');
-    
-                    const classes = content.substring(openNs + 1, closeNs).trim().split('public class').filter(x => x.length > 0 ).map(x => x.trim());
 
-                    const csModels = classes.map(entity => {
-                        const openCl = entity.indexOf('{');
-                        const closeCl = entity.lastIndexOf('}');
-    
-                        if(openCl > -1 && closeCl > -1) {
-                            const entityName = entity.substring(0, openCl).trim();
-                            const entityContent = entity.substring(openCl + 1, closeCl).trim().split(/[\s]+/);
+                    const classes = content.substring(openNs + 1, closeNs).trim();
 
-                            return {
-                                modelName: entityName,
-                                modelContent: this.propArray(entityContent, [])
-                            };
-                        }
-
-                        return null;
-                    });
+                    const csModels = this.findScopeElements(classes)
+                        .filter(element => element.nestingLevel === 0)
+                        .map((element, i, arr) => this.scopeElementsToModelData(element, i, arr, classes))
+                        .filter(classData => classData != null);
 
                     resolve(csModels);
                 }
@@ -70,8 +59,9 @@ export default class FileParser {
 
         return new Promise<(TsModelData | null)[]>((resolve, reject) => {
             Promise.all(modelPromises).then(models => {
+
                 const flatCsModels = models.reduce((prev, curr) => prev.concat(curr), []).filter(model => model !== null);
-    
+                
                 const tsModels = flatCsModels.map(model => this.toTsModel(model, files));
     
                 resolve(tsModels);
@@ -80,6 +70,7 @@ export default class FileParser {
     };
 
     private toTsModel = (csModel: CsModelData | null, filesData: FileData[]) : TsModelData | null => {
+
         if(csModel) {
             const tsProps = csModel.modelContent.map(csProp => <TsPropertyData>{
                 typeDefinition: this.lookupTypeDefinition(csProp.propType, filesData),
@@ -88,7 +79,7 @@ export default class FileParser {
             });
 
             return {
-                modelName: csModel.modelName,
+                modelName: this.parseClassName(csModel.modelName),
                 properties: tsProps
             };
         }
@@ -170,5 +161,56 @@ export default class FileParser {
             propImportPath: null,
             propType: this.mapPrimitiveType(propType)
         };
+    };
+
+    private parseClassName = (declaration: string): string => {
+
+        const hasSpecialChars = declaration.match(/[^a-zA-Z0-9]/g);
+
+        return hasSpecialChars ? declaration.substring(0, declaration.indexOf(hasSpecialChars[0])) : declaration;
+    };
+
+    private findScopeElements = (fileString: string): Nesting[] => {
+        let level = 0; 
+        let nestings: Nesting[] = [];
+    
+        fileString.split('').forEach((x, i) => {
+            if(x === '{') {
+                nestings.push({ nestingSymbol: '{', positionInCode: i, nestingLevel: level });
+                level++;
+            }
+    
+            if(x === '}') {
+                level--;
+                nestings.push({ nestingSymbol: '}', positionInCode: i, nestingLevel: level });
+            }
+        });
+    
+        return nestings;
+    };
+
+    private matchPublicModel = (fileString: string, startPos: number, endPos: number): RegExpMatchArray | null => fileString.substring(startPos, endPos)
+        .match(/(public)(.+)(class|struct|enum)(\s)+/g);
+
+    private scopeElementsToModelData = (element: Nesting, idx: number, arr: Nesting[], namespaceData: string): CsModelData | null => {
+        if(element.nestingSymbol === '{') {
+            const startLookup = idx === 0 ? 0 : arr[idx - 1].positionInCode + 1;
+
+            const publicEntity = this.matchPublicModel(namespaceData, startLookup, element.positionInCode);
+
+            if(publicEntity != null) {
+                const entityName = namespaceData.substring(startLookup, element.positionInCode).replace(publicEntity[0], '').trim();
+                const entityContent = namespaceData.substring(element.positionInCode + 1, arr[idx + 1].positionInCode).trim().split(/[\s]+/);
+
+                return {
+                    modelName: entityName,
+                    modelContent: this.propArray(entityContent, [])
+                };
+            }
+
+            return null;
+        }
+
+        return null;
     };
 }
