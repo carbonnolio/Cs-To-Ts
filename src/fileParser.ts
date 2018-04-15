@@ -1,7 +1,7 @@
 import { promisify } from 'util';
 import * as fs from 'fs';
 
-import { FileData, CsProperty, CsModelData, TsPropertyType, TsPropertyData, TsModelData, Nesting } from './interfaces';
+import { FileData, CsProperty, CsModelData, TsPropertyType, TsPropertyData, TsModelData, Nesting, PrimitiveProp } from './interfaces';
 
 export default class FileParser {
 
@@ -75,7 +75,8 @@ export default class FileParser {
             const tsProps = csModel.modelContent.map(csProp => <TsPropertyData>{
                 typeDefinition: this.lookupTypeDefinition(csProp.propType, filesData),
                 propName: this.pascalToCamel(csProp.propName),
-                isArray: csProp.isArray
+                isArray: csProp.isArray,
+                isDictionary: csProp.isDictionary
             });
 
             return {
@@ -102,12 +103,13 @@ export default class FileParser {
                 
                 const filteredData = propData.filter(x => x !== 'static');
     
-                const isPropArray = this.isCsArrayType(filteredData);
+                const isPropCollection = this.isCsCollectionType(filteredData);
     
                 arr.push({
-                    propType: isPropArray.arrType || filteredData[0],
-                    propName: isPropArray.name || filteredData[1],
-                    isArray: isPropArray.isArray
+                    propType: isPropCollection.collType || filteredData[0],
+                    propName: isPropCollection.name || filteredData[1],
+                    isArray: isPropCollection.isArray,
+                    isDictionary: isPropCollection.isDictionary
                 });
             }
     
@@ -117,36 +119,68 @@ export default class FileParser {
         return arr;
     };
     
-    private isCsArrayType = (propData: string[]): any => {
+    private isCsCollectionType = (propData: string[]): any => {
     
         const propString = propData.slice(0, propData.indexOf('{')).join('');
         
         if(propString.indexOf('[]') > -1) {
             return {
+                isDictionary: false,
                 isArray: true,
-                arrType: propString.substring(0, propString.indexOf('[')),
+                collType: propString.substring(0, propString.indexOf('[')),
                 name: propString.substr(propString.indexOf(']') + 1)
             };
         }
-    
+
+        if(propString.indexOf('Dictionary<') > -1) {
+            return {
+                isDictionary: true,
+                isArray: false,
+                collType: propString.substring(propString.indexOf(',') + 1, propString.indexOf('>')),
+                name: propString.substr(propString.indexOf('>') + 1)
+            };
+        }
         const isCollection = propString.match(/\<(?:<[^<>]+?>|[^<>\,])+?>/);
-    
+
         if(isCollection && isCollection.length > 0 && this.csArrayTypes.some(x => x === propString.substring(0, propString.indexOf('<')))) {
             return {
+                isDictionary: false,
                 isArray: true,
-                arrType: isCollection[0].substring(1, isCollection[0].length - 1),
+                collType: isCollection[0].substring(1, isCollection[0].length - 1),
                 name: propString.substr(propString.indexOf('>') + 1)
             };
         }
     
         return {
+            isDictionary: false,
             isArray: false,
-            arrType: null,
+            collType: null,
             name: null
         };
     }
+
+    private checkNullable = (type: string): PrimitiveProp => type != null && type.indexOf('?') !== -1 ? {
+            propType: type.replace('?', ''),
+            isNullable : true
+        } : {
+            propType: type,
+            isNullable: false
+        };
     
-    private mapPrimitiveType = (csType: string): string => this.csCommonTypeMap[csType.toLowerCase()] || 'any';
+    private mapPrimitiveType = (csType: string): PrimitiveProp => {
+        
+        const csPriminiveProp = this.checkNullable(csType);
+
+        const tsPrimitiveProp =  this.csCommonTypeMap[csPriminiveProp.propType.toLowerCase()];
+
+        return tsPrimitiveProp ? {
+            propType: tsPrimitiveProp,
+            isNullable: csPriminiveProp.isNullable
+        } : {
+            propType: 'any',
+            isNullable: false
+        };
+    };
     
     private pascalToCamel = (str: string) => str ? str.replace(/^(?:[A-Z])+(?=[A-Z])|^[A-Z]/, x => x.toLowerCase()) : null;
 
@@ -154,12 +188,20 @@ export default class FileParser {
         
         const propModelData = filesData.find(fileData => fileData.fileName === propType);
 
-        return propModelData ? {
-            propImportPath: propModelData.filePath,
-            propType: propType
-        } : {
+        if(propModelData) {
+            return {
+                propImportPath: propModelData.filePath,
+                propType: propType,
+                isNullable: false
+            }
+        }
+
+        const primitiveProp = this.mapPrimitiveType(propType);
+
+        return {
             propImportPath: null,
-            propType: this.mapPrimitiveType(propType)
+            propType: primitiveProp.propType,
+            isNullable: primitiveProp.isNullable
         };
     };
 

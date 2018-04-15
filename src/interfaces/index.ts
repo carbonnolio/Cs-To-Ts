@@ -7,3 +7,4 @@ export * from './tsModelData';
 export * from './tsFileData';
 export * from './executeWithParamsFunc';
 export * from './nesting';
+export * from './primitiveProp';

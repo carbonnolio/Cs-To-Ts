@@ -3,10 +3,6 @@ import * as fs from 'fs';
 
 import { FileData } from './interfaces';
 
-// import es6PromiseLib = require('es6-promise');
-
-// const Promise = es6PromiseLib.Promise;
-
 export default class FolderParser {
 
     rootPath: string;

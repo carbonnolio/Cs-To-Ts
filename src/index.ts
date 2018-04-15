@@ -9,7 +9,7 @@ import FileParser from './fileParser';
 import FileGenerator from './fileGenerator';
 import CommandHandler from './commandHandler';
 
-console.log(chalk.blue('Entering App...'));
+console.log(chalk.yellow('Entering App...'));
 
 const statAsync = promisify(fs.stat);
 

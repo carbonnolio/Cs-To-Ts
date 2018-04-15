@@ -4,4 +4,5 @@ export interface TsPropertyData {
     typeDefinition: TsPropertyType;
     propName: string;
     isArray: boolean;
+    isDictionary: boolean;
 }

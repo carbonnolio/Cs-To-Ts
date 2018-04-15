@@ -36,7 +36,7 @@ export default class FileGenerator {
         );
 
         const tsProps = tsModel.properties.reduce((prev, curr) => 
-            `${prev}\t${curr.propName}: ${curr.typeDefinition.propType}${curr.isArray ? '[]' : ''};\n`, ''
+            `${prev}\t${curr.propName}: ${this.assignType(curr)};\n`, ''
         );
         
         const header = `export interface ${tsModel.modelName} {\n`;
@@ -49,4 +49,15 @@ export default class FileGenerator {
     };
 
     private pascalToCamel = (str: string) => str ? str.replace(/^(?:[A-Z])+(?=[A-Z])|^[A-Z]/, x => x.toLowerCase()) : null;
+
+    private assignType = (data: TsPropertyData) => {
+        if(data == null) return 'any';
+
+        if(data.isDictionary) return `{ [key: string]: ${data.typeDefinition.propType} }`;
+
+        const arrayType = data.isArray ? '[]' : '';
+        const isNullable = data.typeDefinition.isNullable ? ' | null' : '';
+
+        return `${data.typeDefinition.propType}${arrayType}${isNullable}`;
+    };
 }

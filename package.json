@@ -12,7 +12,9 @@
     "test": "test",
     "start": "npm run build:live",
     "build:live": "nodemon --exec ./node_modules/.bin/ts-node -- ./src/index.ts",
-    "build": "tsc"
+    "compile": "tsc",
+    "precompile": "node ./devScripts/preBuildSteps.js",
+    "postcompile": "node ./devScripts/postBuildSteps.js"
   },
   "author": "Grigory Novikov",
   "license": "MIT",
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@types/node": "^9.4.7",
     "@types/yargs": "^11.0.0",
+    "del": "^3.0.0",
     "node-cleanup": "^2.1.2",
     "nodemon": "^1.17.1",
     "ts-node": "^3.3.0",
