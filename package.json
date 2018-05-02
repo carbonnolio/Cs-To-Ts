@@ -29,6 +29,7 @@
     "yargs": "^11.1.0"
   },
   "devDependencies": {
+    "@types/mkdirp": "^0.5.2",
     "@types/node": "^9.4.7",
     "@types/yargs": "^11.0.0",
     "del": "^3.0.0",
