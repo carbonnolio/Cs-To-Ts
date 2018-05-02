@@ -24,6 +24,7 @@
   "dependencies": {
     "chalk": "^2.3.2",
     "commander": "^2.15.0",
+    "mkdirp": "^0.5.1",
     "node": "^9.8.0",
     "yargs": "^11.1.0"
   },
